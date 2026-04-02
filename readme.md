@@ -105,34 +105,21 @@ cd network-tool
 ## 2. Install Speedtest CLI
 
 ### Windows
-
+### Linux (Ubuntu/Debian,Arch,Freebsd)
+### macOS
 Download:
 https://www.speedtest.net/apps/cli
 
-### Linux (Ubuntu/Debian)
-
-```bash
-sudo apt install speedtest-cli
-```
-
-### macOS
-
-```bash
-brew install speedtest-cli
-```
 
 ---
 
-## 3. Create config file
+## 3. Run it to create config.js file
 
-Create this file:
+Configure this file:
 
 ```text
-src/main/resources/config.json
+config.json
 ```
-
-Paste this:
-
 ```json
 {
   "run_every": "5m",
@@ -157,7 +144,7 @@ Paste this:
 ## 4. Start the app
 
 ```bash
-mvn spring-boot:run
+java -jar network-monitor-1.2.jar
 ```
 
 ---
@@ -219,9 +206,7 @@ Optional:
 ---
 
 # ❗ Common Problems & Fixes
-
-## App closes immediately
-
+ 
 👉 Missing tools
 
 Run:
@@ -232,6 +217,14 @@ traceroute
 speedtest
 ```
 
+When running the script shoud show 
+```
+Speedtest-cli available: true
+Ping available: true
+Traceroute available: true
+Everything needed Installed :)
+``` 
+
 Fix anything that fails.
 
 ---
@@ -239,7 +232,7 @@ Fix anything that fails.
 ## No data showing
 
 👉 Wait for first scheduled run
-(or shorten `run_every` to test)
+(or shorten `run_every` to test but also should run once on startup so give it a few)
 
 ---
 
@@ -278,6 +271,7 @@ speedtest --version
 
 * Runs locally only (`localhost`)
 * No external data sharing
+* Free and open source
 * Uses system commands (ping, traceroute, etc.)
 
 ---
@@ -297,8 +291,6 @@ speedtest --version
 * Alerts (Discord / Email)
 * Docker support
 * Better UI
-* Authentication
-* Multi-device monitoring
 
 ---
 
