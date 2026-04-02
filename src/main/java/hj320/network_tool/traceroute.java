@@ -130,12 +130,17 @@ public class traceroute {
             hop.put("hop", hopNumber);
 
             if (os.contains("win")) {
-                Pattern pattern = Pattern.compile("^\\s*\\d+\\s+((?:\\d+ ms|\\*\\s+){1,3})\\s+([\\d\\.]+|\\*)$");
+                Pattern pattern = Pattern.compile("^\\s*(\\d+)\\s+(\\*|\\d+ ms|\\*\\s*)\\s+(\\*|\\d+ ms|\\*\\s*)\\s+(\\*|\\d+ ms|\\*\\s*)\\s+([\\d\\.]+|\\*)$");
                 Matcher matcher = pattern.matcher(line);
                 if (matcher.find()) {
-                    String timesStr = matcher.group(1).trim();
-                    String ip = matcher.group(2);
-                    List<String> times = new ArrayList<>(Arrays.asList(timesStr.split("\\s+")));
+                    String ip = matcher.group(5).trim();
+                    List<String> times = new ArrayList<>();
+                    String[] timeArray = {matcher.group(2), matcher.group(3), matcher.group(4)};
+
+                    for (String time : timeArray) {
+                        times.add(time.trim());
+                    }
+
                     hop.put("ip", ip);
                     hop.put("times", times);
                     return hop;
@@ -143,11 +148,12 @@ public class traceroute {
                     return null;
                 }
             } else {
-                Pattern pattern = Pattern.compile("^\\s*\\d+\\s+([\\d\\.\\*]+)\\s+(.*)$");
+
+                Pattern pattern = Pattern.compile("^\\s*(\\d+)\\s+([\\d\\.\\*]+)\\s+(.*)$");
                 Matcher matcher = pattern.matcher(line);
                 if (matcher.find()) {
-                    String ip = matcher.group(1);
-                    String rest = matcher.group(2).trim();
+                    String ip = matcher.group(2);
+                    String rest = matcher.group(3).trim();
                     List<String> times = new ArrayList<>();
                     Matcher timeMatcher = Pattern.compile("(\\d+\\.\\d+ ms|\\*)").matcher(rest);
                     while (timeMatcher.find()) {
@@ -160,7 +166,6 @@ public class traceroute {
                     return null;
                 }
             }
-
         } catch (Exception e) {
             return null;
         }
