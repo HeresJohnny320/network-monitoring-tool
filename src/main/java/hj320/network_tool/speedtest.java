@@ -21,11 +21,12 @@ public class speedtest {
 
     public static void speedtest(String server) {
         System.out.println("Running speed test...");
+       boolean pythonsupport = false;
         try {
             ProcessBuilder pb;
-            String os = System.getProperty("os.name").toLowerCase();
-
-            if (os.contains("win")) {
+            String os = System.getProperty("os.name").toLowerCase(); // NOTE: so i fucked ig i was so tired that i installed the python verson of speedtest and not the one okla has so il keep this code in here incase someone wants to use it with that said python code :)
+//            if (os.contains("win")) {
+            if(pythonsupport == false){
                 if (server != null && !server.isEmpty()) {
                     pb = new ProcessBuilder("speedtest", "--server-id", server, "--format=json");
                 } else {
@@ -64,7 +65,8 @@ public class speedtest {
                 String upload = "";
                 String ping = "";
                 String serverloc = "";
-                if (os.contains("win")) {
+//                if (os.contains("win")) {
+                if(pythonsupport == false){
                     download = String.valueOf(jsonNode.path("download").path("bandwidth").asLong());
                     upload = String.valueOf(jsonNode.path("upload").path("bandwidth").asLong());
                     ping = String.valueOf(jsonNode.path("ping").path("latency").asDouble());
