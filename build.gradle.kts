@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "hj320.network_tool"
-version = "1.0-SNAPSHOT"
+version = "1.1"
 
 repositories {
     mavenCentral()
