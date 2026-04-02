@@ -23,10 +23,20 @@ public class speedtest {
         System.out.println("Running speed test...");
         try {
             ProcessBuilder pb;
-            if (server != null && !server.isEmpty()) {
-                pb = new ProcessBuilder("speedtest", "--server", server, "--json");
+            String os = System.getProperty("os.name").toLowerCase();
+
+            if (os.contains("win")) {
+                if (server != null && !server.isEmpty()) {
+                    pb = new ProcessBuilder("speedtest", "--server-id", server, "--format=json");
+                } else {
+                    pb = new ProcessBuilder("speedtest", "--format=json");
+                }
             } else {
-                pb = new ProcessBuilder("speedtest", "--json");
+                if (server != null && !server.isEmpty()) {
+                    pb = new ProcessBuilder("speedtest", "--server", server, "--json");
+                } else {
+                    pb = new ProcessBuilder("speedtest", "--json");
+                }
             }
 
             pb.redirectErrorStream(true);
@@ -44,19 +54,34 @@ public class speedtest {
                 System.err.println("Speedtest CLI exited with code " + exitCode);
                 return;
             }
+
             String json = output.toString().toLowerCase();
             ObjectMapper mapper = new ObjectMapper();
             try {
                 JsonNode jsonNode = mapper.readTree(json);
-                String download = jsonNode.path("download").asText("");
-                String upload = jsonNode.path("upload").asText("");
-                String ping = jsonNode.path("ping").asText("");
+
+                String download = "";
+                String upload = "";
+                String ping = "";
+                String serverloc = "";
+                if (os.contains("win")) {
+                    download = String.valueOf(jsonNode.path("download").path("bandwidth").asLong());
+                    upload = String.valueOf(jsonNode.path("upload").path("bandwidth").asLong());
+                    ping = String.valueOf(jsonNode.path("ping").path("latency").asDouble());
+                    serverloc = String.valueOf(jsonNode.path("server").path("location").asText(""));
+                } else {
+                    download = jsonNode.path("download").asText("");
+                    upload = jsonNode.path("upload").asText("");
+                    ping = jsonNode.path("ping").asText("");
+                    serverloc = jsonNode.path("server").path("name").asText("");
+                }
+
                 JsonNode serverinfo = jsonNode.path("server");
                 String serverhost = serverinfo.path("host").asText("");
-                String serverloc = serverinfo.path("name").asText("");
                 String serverid = serverinfo.path("id").asText("");
-                System.out.println("download: " + download + ", upload: " + upload + ", ping: " + ping + ", serverid: " + serverid+",serverhost:"+serverhost+",serverloc:"+serverloc);
-                saveToDatabase(download,upload,ping,serverid,serverhost,serverloc);
+
+                System.out.println("download: " + download + ", upload: " + upload + ", ping: " + ping + ", serverid: " + serverid + ", serverhost: " + serverhost + ", serverloc: " + serverloc);
+                saveToDatabase(download, upload, ping, serverid, serverhost, serverloc);
 
             } catch (Exception e) {
                 e.printStackTrace();
