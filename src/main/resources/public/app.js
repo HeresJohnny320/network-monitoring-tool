@@ -1,8 +1,8 @@
 const REFRESH_MS = 5000;
 
 /* ---------- Helpers ---------- */
-function mbps(bits) {
-    return (bits / 1000000).toFixed(1) + ' Mbps';
+function mbps(bytesPerSecond) {
+    return ((bytesPerSecond * 8) / 1_000_000).toFixed(1) + ' Mbps';
 }
 function latencyClass(ms) {
     if (ms < 50) return 'good';
