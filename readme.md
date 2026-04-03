@@ -186,6 +186,14 @@ You can also access raw data:
 
 All return JSON.
 
+# NOTE speedtest is in bytesPerSecond for download and upload
+
+```java
+function mbps(bytesPerSecond) {
+    return ((bytesPerSecond * 8) / 1_000_000).toFixed(1) + ' Mbps';
+}
+```
+
 ---
 
 # 🗄️ Data Storage
