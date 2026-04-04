@@ -8,6 +8,9 @@ import (
 )
 
 type Config struct {
+	RunPing           bool     `json:"run_ping"`
+	Runtraceroute     bool     `json:"run_traceroute"`
+	Runspeedtest      bool     `json:"run_speedtest"`
 	TracerouteHost    []string `json:"traceroute_host"`
 	PingHost          []string `json:"ping_host"`
 	SpeedtestServerID string   `json:"speedtest_server_id"`
@@ -41,6 +44,9 @@ func LoadConfig() error {
 	_, err = os.Stat(configFile)
 	if os.IsNotExist(err) {
 		cfg = Config{
+			RunPing:           true,
+			Runtraceroute:     true,
+			Runspeedtest:      true,
 			TracerouteHost:    []string{"google.com", "github.com"},
 			PingHost:          []string{"google.com", "github.com", "1.1.1.1", "8.8.8.8"},
 			SpeedtestServerID: "",

@@ -24,13 +24,13 @@ func main() {
 	utils.CheckDepend()
 
 	utils.ScheduleFromConfig(func() {
-		if utils.CommandExistsCached("ping") {
+		if utils.CommandExistsCached("ping") && utils.Cfg.RunPing {
 			tools.PingHosts(utils.Cfg.PingHost)
 		}
-		if utils.CommandExistsCached("tracert") || utils.CommandExistsCached("traceroute") {
+		if utils.CommandExistsCached("tracert") && utils.Cfg.Runtraceroute || utils.CommandExistsCached("traceroute") && utils.Cfg.Runtraceroute {
 			tools.RunTracerouteForHosts(utils.Cfg.TracerouteHost)
 		}
-		if utils.CommandExistsCached("speedtest") {
+		if utils.CommandExistsCached("speedtest") && utils.Cfg.Runspeedtest {
 			tools.RunSpeedtest(utils.Cfg.SpeedtestServerID)
 		}
 	})
