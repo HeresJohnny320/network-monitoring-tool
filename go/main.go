@@ -1,10 +1,15 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"net/http"
 	"network_monitor_tool/tools"
 	"network_monitor_tool/utils"
 )
+
+//go:embed static/*
+var staticFiles embed.FS
 
 func main() {
 	if err := utils.LoadConfig(); err != nil {
@@ -35,13 +40,28 @@ func main() {
 	http.HandleFunc("/speedtest", tools.GetAllSpeedtestResults)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "static/index.html")
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+
+		data, err := staticFiles.ReadFile("static/index.html")
+		if err != nil {
+			http.Error(w, "Index not found: "+err.Error(), 500)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		w.Write(data)
 	})
 
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	staticSub, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		panic(err)
+	}
+
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))))
 
 	utils.PrintColor("cyan", "Server running on :8080")
 	http.ListenAndServe(":8080", nil)
-
 }
