@@ -33,7 +33,7 @@ func LoadConfig() error {
 	if err != nil {
 		return fmt.Errorf("cannot get user config dir: %v", err)
 	}
-	appDir := filepath.Join(configDir, "network_monitor_tool")
+	appDir := filepath.Join(configDir, "heresjohnnys320_network_monitor_tool")
 
 	if err := os.MkdirAll(appDir, 0755); err != nil {
 		return fmt.Errorf("cannot create app config dir: %v", err)

@@ -40,7 +40,7 @@ func InitDatabase() *DBManager {
 			PrintColor("red", "cannot get user config dir: "+err.Error())
 			return nil
 		}
-		appDir := filepath.Join(configDir, "network_monitor_tool")
+		appDir := filepath.Join(configDir, "heresjohnnys320_network_monitor_tool")
 
 		if err := os.MkdirAll(appDir, 0755); err != nil {
 			PrintColor("red", "cannot create app config dir: "+err.Error())
