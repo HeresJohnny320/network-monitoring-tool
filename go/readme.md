@@ -52,7 +52,6 @@ Download speedtest cli in console / powershell
 | **Windows** | `winget install --id=Ookla.Speedtest.CLI -e` |
 then for the rest of you
 https://www.speedtest.net/apps/cli
-```
 
 
 Check installation:
