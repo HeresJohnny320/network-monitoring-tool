@@ -47,9 +47,11 @@ No Go installation or compilation needed.
 
 ---
 
-### 2️⃣ Install Speedtest CLI  
-in powershell
-Download speedtest cli with: winget install --id=Ookla.Speedtest.CLI -e
+### 2️⃣ Install Speedtest CLI
+Download speedtest cli in console / powershell
+| **Windows** | `winget install --id=Ookla.Speedtest.CLI -e` |
+then for the rest of you
+https://www.speedtest.net/apps/cli
 ```
 
 
