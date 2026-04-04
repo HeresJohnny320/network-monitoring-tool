@@ -11,10 +11,10 @@ Works on: **Windows, Linux, macOS (Intel & ARM), FreeBSD**
 
 ## 📸 Screenshots  
 
-![Dashboard Screenshot](https://via.placeholder.com/800x400.png?text=Dashboard+Screenshot)  
+![Dashboard Screenshot](https://github.com/HeresJohnny320/network-monitoring-tool/blob/main/go/Screenshot_20260404_093345.png)  
 *Live dashboard showing ping, traceroute, and speedtest data*  
 
-![Logs Screenshot](https://via.placeholder.com/800x400.png?text=Logs+Screenshot)  
+![Logs Screenshot](https://github.com/HeresJohnny320/network-monitoring-tool/blob/main/go/Screenshot_20260404_093428.png)  
 *Historical logs and charts for analysis*  
 
 ---
