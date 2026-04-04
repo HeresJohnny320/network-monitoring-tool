@@ -1,0 +1,13 @@
+{
+  "traceroute_host": ["google.com", "github.com"],
+  "ping_host": ["google.com", "github.com","1.1.1.1","8.8.8.8"],
+  "speedtest_server_id": "",
+  "run_sql": false,
+  "sql_user": "user",
+  "sql_password": "password",
+  "sql_host": "localhost",
+  "sql_port": "3306",
+  "sql_database": "my database name",
+  "run_every":"1h",
+  "NOTE_for_run_every":"you can do 1h or 1m or 1s or combine it like 1h1m1s or do what ever u want"
+}
