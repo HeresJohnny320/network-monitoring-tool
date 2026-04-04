@@ -66,10 +66,10 @@ speedtest --version
 
 | Platform | Path |
 |----------|------|
-| **Windows** | `%APPDATA%\network_monitoring_tool` |
-| **Linux** | `$HOME/.config/network_monitoring_tool` |
-| **macOS** | `$HOME/Library/Application Support/network_monitoring_tool` |
-| **FreeBSD** | `$HOME/.config/network_monitoring_tool` |
+| **Windows** | `%APPDATA%\heresjohnnys320_network_monitor_tool` |
+| **Linux** | `$HOME/.config/heresjohnnys320_network_monitor_tool` |
+| **macOS** | `$HOME/Library/Application Support/heresjohnnys320_network_monitor_tool` |
+| **FreeBSD** | `$HOME/.config/heresjohnnys320_network_monitor_tool` |
 
 Stored files:  
 
