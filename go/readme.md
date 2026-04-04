@@ -5,7 +5,7 @@
 A **cross-platform network monitoring tool** with a **live web dashboard**, built in **Go**.  
 Monitor your network automatically and view results in your browser.  
 
-Works on: **Windows, Linux, macOS (Intel & ARM), FreeBSD**  
+Works on: **Windows, Linux, macOS (Intel & ARM), FreeBSD and PFsense**  
 
 ---
 
