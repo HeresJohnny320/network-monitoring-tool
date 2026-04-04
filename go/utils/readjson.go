@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
@@ -19,14 +20,25 @@ type Config struct {
 	RunEvery          string   `json:"run_every"`
 }
 
-const configFile = "config.json"
-
 var Cfg *Config
 
 func LoadConfig() error {
 	var cfg Config
 
-	_, err := os.Stat(configFile)
+	configDir, err := os.UserConfigDir()
+
+	if err != nil {
+		return fmt.Errorf("cannot get user config dir: %v", err)
+	}
+	appDir := filepath.Join(configDir, "network_monitor_tool")
+
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		return fmt.Errorf("cannot create app config dir: %v", err)
+	}
+
+	configFile := filepath.Join(appDir, "config.json")
+
+	_, err = os.Stat(configFile)
 	if os.IsNotExist(err) {
 		cfg = Config{
 			TracerouteHost:    []string{"google.com", "github.com"},
@@ -37,7 +49,7 @@ func LoadConfig() error {
 			SQLPassword:       "password",
 			SQLHost:           "localhost",
 			SQLPort:           "3306",
-			SQLDatabase:       "my database name",
+			SQLDatabase:       "my_database_name",
 			RunEvery:          "1h",
 		}
 
@@ -53,7 +65,7 @@ func LoadConfig() error {
 			return fmt.Errorf("failed to write default config: %v", err)
 		}
 
-		PrintColor("cyan", "Created default config.json")
+		PrintColor("cyan", "Created default config.json at "+configFile)
 	} else {
 		file, err := os.Open(configFile)
 		if err != nil {
