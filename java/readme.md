@@ -187,8 +187,9 @@ You can also access raw data:
 All return JSON.
 
 # NOTE speedtest is in bytesPerSecond for download and upload
-
+* http://localhost:8080/speedtest is in bytesPerSecond for download/upload
 ```java
+// if you want to make ur own code heres how you convert it 
 function mbps(bytesPerSecond) {
     return ((bytesPerSecond * 8) / 1_000_000).toFixed(1) + ' Mbps';
 }
