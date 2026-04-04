@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 
 	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
+	// _ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 type DBManager struct {
@@ -26,6 +27,7 @@ func InitDatabase() *DBManager {
 
 	if Cfg == nil {
 		PrintColor("red", "config not loaded. Call LoadConfig() first.")
+		return nil
 	}
 
 	db := &DBManager{
@@ -36,16 +38,34 @@ func InitDatabase() *DBManager {
 		configDir, err := os.UserConfigDir()
 		if err != nil {
 			PrintColor("red", "cannot get user config dir: "+err.Error())
+			return nil
 		}
-		appDir := filepath.Join(configDir, "myapp")
+		appDir := filepath.Join(configDir, "network_monitor_tool")
 
 		if err := os.MkdirAll(appDir, 0755); err != nil {
 			PrintColor("red", "cannot create app config dir: "+err.Error())
+			return nil
 		}
 
-		db.URL = filepath.Join(appDir, "database.db")
+		db.URL = filepath.ToSlash(filepath.Join(appDir, "database.db"))
 		db.User = ""
 		db.Password = ""
+
+		if _, err := os.Stat(db.URL); os.IsNotExist(err) {
+			file, err := os.Create(db.URL)
+			if err != nil {
+				PrintColor("red", "cannot create SQLite file: "+err.Error())
+				return nil
+			}
+			PrintColor("bright_green", "created database.db at "+appDir)
+			file.Close()
+		}
+		f, err := os.OpenFile(db.URL, os.O_RDWR, 0666)
+		if err != nil {
+			PrintColor("red", "cannot write to SQLite file: "+err.Error())
+			return nil
+		}
+		f.Close()
 	} else {
 		user := Cfg.SQLUser
 		password := Cfg.SQLPassword
@@ -69,8 +89,20 @@ func GetDatabase() *DBManager {
 }
 
 func (db *DBManager) GetConnection() (*sql.DB, error) {
+	var conn *sql.DB
+	var err error
 	if !db.RunSQL {
-		return sql.Open("sqlite3", db.URL)
+		conn, err = sql.Open("sqlite", db.URL)
+	} else {
+		conn, err = sql.Open("mysql", db.URL)
 	}
-	return sql.Open("mysql", db.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := conn.Ping(); err != nil {
+		return nil, fmt.Errorf("cannot ping database: %v", err)
+	}
+
+	return conn, nil
 }
