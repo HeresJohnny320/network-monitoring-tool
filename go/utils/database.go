@@ -3,6 +3,8 @@ package utils
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/mattn/go-sqlite3"
@@ -31,7 +33,17 @@ func InitDatabase() *DBManager {
 	}
 
 	if !db.RunSQL {
-		db.URL = "database.db"
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			PrintColor("red", "cannot get user config dir: "+err.Error())
+		}
+		appDir := filepath.Join(configDir, "myapp")
+
+		if err := os.MkdirAll(appDir, 0755); err != nil {
+			PrintColor("red", "cannot create app config dir: "+err.Error())
+		}
+
+		db.URL = filepath.Join(appDir, "database.db")
 		db.User = ""
 		db.Password = ""
 	} else {
