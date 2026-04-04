@@ -1,265 +1,57 @@
-# 🌐 Network Tool — Easy Network Monitoring Dashboard
+# 🌐 Network Monitoring Tool (Go)  
 
-A simple, automatic network monitoring tool with a built-in web dashboard.
+![Go Version](https://img.shields.io/badge/Go-1.20%2B-blue) ![Release](https://img.shields.io/badge/Release-v1.4-green) ![License](https://img.shields.io/github/license/HeresJohnny320/network-monitoring-tool) ![OS](https://img.shields.io/badge/OS-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20FreeBSD-lightgrey)  
 
-It checks your internet and network health by running:
+A **cross-platform network monitoring tool** with a **live web dashboard**, built in **Go**.  
+Monitor your network automatically and view results in your browser.  
 
-* 📡 Ping (is a site reachable? how fast?)
-* 🛰️ Traceroute (where does your connection go?)
-* ⚡ Speed tests (download, upload, latency)
-
-Everything is:
-
-* ✅ Logged to a database
-* 📊 Shown in a live dashboard
-* 🔁 Run automatically on a schedule
+Works on: **Windows, Linux, macOS (Intel & ARM), FreeBSD**  
 
 ---
 
-# 🧠 What This App Does (Simple Explanation)
+## 📸 Screenshots  
 
-Once you start the app, it will:
+![Dashboard Screenshot](https://via.placeholder.com/800x400.png?text=Dashboard+Screenshot)  
+*Live dashboard showing ping, traceroute, and speedtest data*  
 
-1. Check if required tools are installed (`ping`, `traceroute`, `speedtest`)
-2. Start a local web server
-3. Every few minutes (you choose):
-
-    * Ping your selected websites
-    * Run traceroute
-    * Run a speed test
-4. Save all results
-5. Show everything in a dashboard you can open in your browser
+![Logs Screenshot](https://via.placeholder.com/800x400.png?text=Logs+Screenshot)  
+*Historical logs and charts for analysis*  
 
 ---
 
-# 🖥️ What You See (The UI)
+## 🧠 How It Works  
 
-Open this in your browser:
-
-```text
-http://localhost:8080
-```
-
----
-
-## 📊 Dashboard Tab
-
-This is your **live view**:
-
-* ⚡ Latest speed test
-* 📡 Ping status (per host)
-* 🧭 Latest traceroute
-
-Updates automatically every **5 seconds**
+1. Checks for required tools: `ping`, `traceroute`, `speedtest`  
+2. Starts a **local web server**  
+3. Every few minutes (configurable):  
+   * Ping your hosts  
+   * Run traceroute  
+   * Run a speed test  
+4. Saves results to a database  
+5. Shows a **live dashboard**  
 
 ---
 
-## 📜 Logs Tab
+## 📦 Download & Setup  
 
-This is your **history**:
+### 1️⃣ Download Prebuilt Binaries  
 
-* All past speed tests
-* All ping logs
-* All traceroutes
-* 📅 Filter by date
-* 📈 Charts:
+Go to the **[Releases](https://github.com/HeresJohnny320/network-monitoring-tool/releases)** tab and download your platform:  
 
-    * Speed over time
-    * Ping over time
+* Windows  
+* Linux  
+* macOS Intel & ARM  
+* FreeBSD  
 
----
-
-# ⚙️ Requirements (IMPORTANT)
-
-You MUST have these installed:
-
-### ✅ Java
-
-* Java 17 or newer
-
-### ✅ Required system tools
-
-Test these in your terminal:
-
-```bash
-ping google.com
-traceroute google.com   # or tracert on Windows
-speedtest
-```
-
-If any fail → install them before running the app.
+No Go installation or compilation needed.  
 
 ---
 
-# 📦 Setup (Step-by-Step)
+### 2️⃣ Install Speedtest CLI  
 
-## 1. Download the project
+Download from: https://www.speedtest.net/apps/cli  
 
-```bash
-git clone https://github.com/your-username/network-tool.git
-cd network-tool
-```
-
----
-
-## 2. Install Speedtest CLI
-
-### Windows
-### Linux (Ubuntu/Debian,Arch,Freebsd)
-### macOS
-Download:
-https://www.speedtest.net/apps/cli
-
-
----
-
-## 3. Run it to create config.js file
-
-Configure this file:
-
-```text
-config.json
-```
-```json
-{
-  "run_every": "5m",
-
-  "ping_host": ["google.com", "cloudflare.com"],
-  "traceroute_host": ["google.com"],
-
-  "speedtest_server_id": "",
-
-  "run_sql": false,
-
-  "sql_user": "",
-  "sql_password": "",
-  "sql_host": "localhost",
-  "sql_port": "3306",
-  "sql_database": "network_tool"
-}
-```
-
----
-
-## 4. Start the app
-
-```bash
-java -jar network-monitor-1.2.jar
-```
-
----
-
-## 5. Open the dashboard
-
-Go to:
-
-```text
-http://localhost:8080
-```
-
----
-
-# ⏱️ How Scheduling Works
-
-You control how often tests run:
-
-```json
-"run_every": "5m"
-```
-
-Examples:
-
-* `"30s"` → every 30 seconds
-* `"5m"` → every 5 minutes
-* `"1h"` → every hour
-* `"1h30m"` → every 1 hour 30 minutes
-
----
-
-# 🔌 API (For Advanced Users)
-
-You can also access raw data:
-
-* http://localhost:8080/ping
-* http://localhost:8080/speedtest
-* http://localhost:8080/traceroute
-
-All return JSON.
-
-# NOTE speedtest is in bytesPerSecond for download and upload
-* http://localhost:8080/speedtest is in bytesPerSecond for download/upload
-```java
-// if you want to make ur own code heres how you convert it 
-function mbps(bytesPerSecond) {
-    return ((bytesPerSecond * 8) / 1_000_000).toFixed(1) + ' Mbps';
-}
-```
-
----
-
-# 🗄️ Data Storage
-
-By default:
-
-* Uses **SQLite**
-* Creates a file:
-
-```text
-database.db
-```
-
-Optional:
-
-* You can enable MySQL in config
-
----
-
-# ❗ Common Problems & Fixes
- 
-👉 Missing tools
-
-Run:
-
-```bash
-ping
-traceroute
-speedtest
-```
-
-When running the script shoud show 
-```
-Speedtest-cli available: true
-Ping available: true
-Traceroute available: true
-Everything needed Installed :)
-``` 
-
-Fix anything that fails.
-
----
-
-## No data showing
-
-👉 Wait for first scheduled run
-(or shorten `run_every` to test but also should run once on startup so give it a few)
-
----
-
-## UI loads but empty
-
-Check API works:
-
-```text
-http://localhost:8080/ping
-```
-
-If that works → UI will work
-
----
-
-## Speedtest fails
-
-Make sure this works:
+Check installation:
 
 ```bash
 speedtest --version
@@ -267,48 +59,201 @@ speedtest --version
 
 ---
 
-# 📌 Tips
+### 3️⃣ Config & Database Locations  
 
-* Start with `"run_every": "1m"` for testing
-* Add multiple hosts to monitor more targets
-* Leave server running for long-term tracking
-* Use Logs tab to analyze trends
+| Platform | Path |
+|----------|------|
+| **Windows** | `%APPDATA%\network_monitoring_tool` |
+| **Linux** | `$HOME/.config/network_monitoring_tool` |
+| **macOS** | `$HOME/Library/Application Support/network_monitoring_tool` |
+| **FreeBSD** | `$HOME/.config/network_monitoring_tool` |
 
----
+Stored files:  
 
-# 🔒 Is This Safe?
+* `config.json` → configuration  
+* `database.db` → SQLite database (if MySQL not enabled)  
 
-* Runs locally only (`localhost`)
-* No external data sharing
-* Free and open source
-* Uses system commands (ping, traceroute, etc.)
-
----
-
-# 💡 What This Is Good For
-
-* Checking if your internet is unstable
-* Monitoring servers or websites
-* Seeing latency spikes
-* Tracking ISP performance over time
-* Home lab monitoring
+> The app automatically reads/writes here. Missing `config.json` → **default file is created**.  
 
 ---
 
-# 🚧 Possible Future Features
+### 4️⃣ Example `config.json`  
 
-* Alerts (Discord / Email)
-* Docker support
-* Better UI
+```json
+{
+  "run_every": "5m",
+  "ping_hosts": ["google.com", "cloudflare.com"],
+  "traceroute_hosts": ["google.com"],
+  "speedtest_server_id": "",
+  "use_mysql": false,
+  "mysql_user": "",
+  "mysql_password": "",
+  "mysql_host": "localhost",
+  "mysql_port": "3306",
+  "mysql_database": "network_tool"
+}
+```
 
 ---
 
-# 🎉 Done!
+### 5️⃣ Run the App  
 
-Once running, just leave it open and it will:
+#### Linux/macOS/FreeBSD
 
-* keep collecting data
-* keep updating the dashboard
-* give you a full picture of your network over time
+```bash
+./network-tool-go
+```
+
+#### Windows  
+
+Double-click `.exe` or run in PowerShell:
+
+```powershell
+network-tool-go.exe
+```
 
 ---
+
+### 6️⃣ Open Dashboard  
+
+```text
+http://localhost:8080
+```
+
+---
+
+## ⏱️ Scheduling  
+
+Set test frequency in `config.json`:
+
+```json
+"run_every": "5m"
+```
+
+Examples:  
+
+* `"30s"` → every 30 seconds  
+* `"5m"` → every 5 minutes  
+* `"1h"` → every hour  
+* `"1h30m"` → every 1 hour 30 minutes  
+
+> First test runs immediately on startup.  
+
+---
+
+## 📊 Dashboard Features  
+
+* ⚡ Latest speed test  
+* 📡 Ping status per host  
+* 🧭 Latest traceroute  
+* Auto-updates every **5 seconds**  
+
+---
+
+## 📜 Logs  
+
+* View all past speed tests, pings, and traceroutes  
+* Filter by date  
+* Charts:  
+  * Speed over time  
+  * Ping over time  
+
+---
+
+## 🔌 API  
+
+Access raw JSON:  
+
+* `http://localhost:8080/ping`  
+* `http://localhost:8080/speedtest`  
+* `http://localhost:8080/traceroute`  
+
+Speedtest is in bytes/sec → convert to Mbps:
+
+```go
+func Mbps(bytesPerSecond float64) string {
+    return fmt.Sprintf("%.1f Mbps", (bytesPerSecond*8)/1_000_000)
+}
+```
+
+---
+
+## ❗ Common Issues  
+
+### Missing Tools  
+
+```bash
+ping
+traceroute
+speedtest
+```
+
+Should report:
+
+```text
+Speedtest-cli available: true
+Ping available: true
+Traceroute available: true
+Everything needed Installed :)
+```
+
+---
+
+### No Data / Empty UI  
+
+* Wait for the first scheduled run  
+* Check API (`http://localhost:8080/ping`)  
+
+---
+
+## 💡 Tips  
+
+* Start with `"run_every": "1m"` for testing  
+* Add multiple hosts to monitor more targets  
+* Keep server running for long-term tracking  
+* Use logs to analyze trends  
+
+---
+
+## 🔒 Safety  
+
+* Runs **locally only** (`localhost`)  
+* No external data sharing  
+* Free & open-source  
+* Uses system commands only  
+
+---
+
+## 🚀 Use Cases  
+
+* Detect internet instability  
+* Monitor servers/websites  
+* Observe latency spikes  
+* Track ISP performance over time  
+* Home lab monitoring  
+
+---
+
+## 🚧 Future Features  
+
+* Alerts (Discord / Email)  
+* Docker support  
+* Enhanced UI  
+
+---
+
+## 🎉 Done!  
+
+Run it once, leave it open, and your **network monitoring dashboard** automatically:  
+
+* Collects data  
+* Updates the live dashboard  
+* Provides insights over time  
+
+---
+
+## 🔗 Links  
+
+* [Project Repository](https://github.com/HeresJohnny320/network-monitoring-tool/)  
+* [Latest Release](https://github.com/HeresJohnny320/network-monitoring-tool/releases)
+
