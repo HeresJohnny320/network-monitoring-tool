@@ -41,7 +41,7 @@ Go to the **[Releases](https://github.com/HeresJohnny320/network-monitoring-tool
 * Windows  
 * Linux  
 * macOS Intel & ARM  
-* FreeBSD  
+* FreeBSD (even PFsense)
 
 No Go installation or compilation needed.  
 
