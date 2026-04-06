@@ -38,7 +38,7 @@ func RunTracerouteForHosts(hosts []string) {
 func RunTraceroute(host string) TracerouteResult {
 	result := TracerouteResult{
 		Host:      host,
-		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
+		Timestamp: time.Now().Format(time.RFC3339),
 		Hops:      []TracerouteHop{},
 	}
 

@@ -27,7 +27,7 @@ func PingHosts(hosts []string) {
 
 	for _, host := range hosts {
 		result := PingHost(host)
-		timestamp := time.Now().Format("2006-01-02 15:04:05")
+		timestamp := time.Now().Format(time.RFC3339)
 
 		utils.PrintColor("blue", "Ping result: host="+result.Host+" pass="+strconv.Itoa(boolToInt(result.Pass))+" timeMs="+strconv.FormatInt(result.TimeMs, 10)+" timestamp="+timestamp+"\n")
 
