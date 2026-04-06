@@ -38,7 +38,7 @@ var Styles = map[string]string{
 }
 
 func PrintColor(color string, text string, styles ...string) {
-	timestamp := time.Now().Format(time.RFC3339)
+	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
 	code, ok := Colors[color]
 	if !ok {
 		code = Styles["reset"]

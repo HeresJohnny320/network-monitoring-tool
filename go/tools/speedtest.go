@@ -118,7 +118,7 @@ func saveSpeedtestToDB(download, upload, ping, serverID, serverHost, serverLoc s
 	(download, upload, ping, server_id, server_host, server_location, timestamp)
 	VALUES (?, ?, ?, ?, ?, ?, ?)`
 
-	timestamp := time.Now().Format(time.RFC3339)
+	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
 	_, err = conn.Exec(sqlStmt, download, upload, ping, serverID, serverHost, serverLoc, timestamp)
 	if err != nil {
 		utils.PrintColor("red", "DB insert error:", err.Error())

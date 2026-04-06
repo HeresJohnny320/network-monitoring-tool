@@ -1,4 +1,7 @@
 const REFRESH_MS = 5000;
+let logs = { speed: [], ping: [], trace: [] };
+window.speedChart = null;
+window.pingChart = null;
 
 /* ---------- Helpers ---------- */
 function mbps(bytesPerSecond) {
@@ -9,28 +12,24 @@ function latencyClass(ms) {
     if (ms < 100) return 'warn';
     return 'bad';
 }
+
 function formatDate(ts) {
     if (!ts) return "-";
+    const d = new Date(ts);
+    if (isNaN(d)) return ts;
 
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
 
-    let d = new Date(ts);
-    if (!isNaN(d)) return d.toLocaleString();
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
 
-    const cleaned = ts.replace(/[^0-9]/g, '');
-    if (cleaned.length >= 14) {
-        const year = parseInt(cleaned.slice(0, 4));
-        const month = parseInt(cleaned.slice(4, 6)) - 1;
-        const day = parseInt(cleaned.slice(6, 8));
-        const hour = parseInt(cleaned.slice(8, 10));
-        const min = parseInt(cleaned.slice(10, 12));
-        const sec = parseInt(cleaned.slice(12, 14));
-        d = new Date(year, month, day, hour, min, sec);
-        if (!isNaN(d)) return d.toLocaleString();
-    }
-
-    return ts;
+    return `${year}-${month}-${day} ${hours}:${minutes}${ampm}`;
 }
-
 /* ---------- DASHBOARD PAGE ---------- */
 if(document.getElementById("download")){
 async function loadSpeedtest(){
@@ -86,41 +85,6 @@ async function loadSpeedtest(){
 }
 
 /* ---------- CHARTS ---------- */
-function updateCharts() {
-    if (!logs.speed.length || !logs.ping.length) return;
-
-    const speedCtx = document.getElementById('speedChart').getContext('2d');
-    const speedLabels = logs.speed.map(s => formatDate(s.timestamp).split(', ')[1] || formatDate(s.timestamp));
-    const downloadData = logs.speed.map(s => parseFloat(s.download)/1000000);
-    const uploadData = logs.speed.map(s => parseFloat(s.upload)/1000000);
-
-    if (window.speedChart) window.speedChart.destroy();
-    window.speedChart = new Chart(speedCtx, {
-        type: 'line',
-        data: {
-            labels: speedLabels,
-            datasets: [
-                { label: 'Download Mbps', data: downloadData, borderColor: '#22c55e', fill: false },
-                { label: 'Upload Mbps', data: uploadData, borderColor: '#38bdf8', fill: false }
-            ]
-        },
-        options: {
-            responsive: true,
-            scales: { y: { beginAtZero: true } }
-        }
-    });
-
-    const pingCtx = document.getElementById('pingChart').getContext('2d');
-    const pingLabels = logs.ping.map(p => formatDate(p.timestamp).split(', ')[1] || formatDate(p.timestamp));
-    const pingData = logs.ping.map(p => parseFloat(p.timems));
-
-    if (window.pingChart) window.pingChart.destroy();
-    window.pingChart = new Chart(pingCtx, {
-        type: 'line',
-        data: { labels: pingLabels, datasets: [{ label: 'Ping ms', data: pingData, borderColor: '#facc15', fill: false }] },
-        options: { responsive: true, scales: { y: { beginAtZero: false } } }
-    });
-}
 
 
 /* ---------- LOGS PAGE ---------- */
@@ -190,10 +154,9 @@ if (document.getElementById("speedTable")) {
                 fetch("/traceroute")
             ]);
 
-            logs.speed = await speedRes.json();
-            logs.ping = await pingRes.json();
-            logs.trace = await traceRes.json();
-
+            logs.speed = await speedRes.json() || [];
+            logs.ping = await pingRes.json() || [];
+            logs.trace = await traceRes.json() || [];
             renderLogs();
             updateCharts();
         } catch (e) {
