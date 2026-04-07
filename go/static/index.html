@@ -62,8 +62,15 @@
             <label for="filterDate">Date:</label>
             <input type="date" id="filterDate">
             <button id="applyFilter">Apply</button>
-            <button id="downloadBtn">Download Logs</button>
-            <a href="/">&#8592; Back to Dashboard</a>
+            <div class="download-dropdown">
+                <button id="downloadBtn">Download Logs ⬇️</button>
+                <div id="downloadOptions" class="dropdown-content" style="display:none;">
+                    <button data-format="json">JSON</button>
+                    <button data-format="csv">CSV</button>
+                    <button data-format="txt">TXT</button>
+                    <button data-format="html">HTML</button>
+                </div>
+            </div>
         </div>
 
         <h2>⚡ Speed Test Logs</h2>

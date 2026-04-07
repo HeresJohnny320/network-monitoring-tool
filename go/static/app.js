@@ -156,74 +156,161 @@ if (document.getElementById("speedTable")) {
             console.error("Error loading logs:", e);
         }
     }
-
-    function renderLogs(filterDate = null, filterMonth = null, filterYear = null) {
-        const speedTable = document.querySelector('#speedTable tbody');
-        const pingTable = document.querySelector('#pingLogs tbody');
-        const traceTable = document.querySelector('#traceLogs tbody');
-
-        speedTable.innerHTML = '';
-        pingTable.innerHTML = '';
-        traceTable.innerHTML = '';
-
-        const filterDateObj = filterDate ? new Date(filterDate) : null;
-        const filterMonthObj = filterMonth ? new Date(filterMonth + '-01') : null;
-
-        logs.speed
-            .filter(s => {
-                if (!filterDateObj) return true;
-                const ts = new Date(s.timestamp);
-                return ts.toDateString() === filterDateObj.toDateString();
-            })
-            .forEach(s => {
-                const d = formatDate(s.timestamp);
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${d}</td>
-                    <td>${mbps(s.download)}</td>
-                    <td>${mbps(s.upload)}</td>
-                    <td>${s.ping} ms</td>
-                    <td>${s.serverId || '-'}</td>
-                    <td>${s.serverHost || '-'}</td>
-                    <td>${s.serverLocation || '-'}</td>
-                `;
-                speedTable.appendChild(row);
-            });
-
-        logs.ping
-            .filter(p => {
-                const ts = new Date(p.timestamp);
-                if (filterDateObj && ts.toDateString() !== filterDateObj.toDateString()) return false;
-                if (filterMonthObj && (ts.getFullYear() !== filterMonthObj.getFullYear() || ts.getMonth() !== filterMonthObj.getMonth())) return false;
-                if (filterYear && ts.getFullYear() !== filterYear) return false;
-                return true;
-            })
-            .forEach(p => {
-                const d = formatDate(p.timestamp);
-                const row = document.createElement('tr');
-                row.innerHTML = `<td>${d}</td><td>${p.host}</td><td class='${latencyClass(p.timems)}'>${p.timems} ms</td><td>${p.success === 'true' ? '✅' : '❌'}</td>`;
-                pingTable.appendChild(row);
-            });
-
-        logs.trace
-            .filter(t => {
-                if (!filterDateObj) return true;
-                const ts = new Date(t.timestamp);
-                return ts.toDateString() === filterDateObj.toDateString();
-            })
-            .forEach(t => {
-                const d = formatDate(t.timestamp);
-                t.hops.forEach(h => {
-                    if (h.ip === '*') return;
-                    const valid = h.times.filter(x => x !== null);
-                    const avg = valid.length ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) : '-';
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td>${d}</td><td>${t.id}</td><td>${h.hop}</td><td>${h.ip}</td><td>${avg} ms</td>`;
-                    traceTable.appendChild(row);
-                });
-            });
+document.getElementById("applyFilter").addEventListener("click", () => {
+    const dateStr = document.getElementById("filterDate").value; // yyyy-mm-dd
+    if (!dateStr) {
+        renderLogs();
+        return;
     }
+    renderLogs(dateStr);
+});
+function renderLogs(filterDate = null) {
+    const speedTable = document.querySelector('#speedTable tbody');
+    const pingTable = document.querySelector('#pingLogs tbody');
+    const traceTable = document.querySelector('#traceLogs tbody');
+
+    speedTable.innerHTML = '';
+    pingTable.innerHTML = '';
+    traceTable.innerHTML = '';
+
+    const filterDateObj = filterDate ? new Date(filterDate) : null;
+
+    // SPEED LOGS
+    logs.speed
+        .filter(s => {
+            if (!filterDateObj) return true;
+            const ts = new Date(s.timestamp);
+            return ts.getFullYear() === filterDateObj.getFullYear() &&
+                   ts.getMonth() === filterDateObj.getMonth() &&
+                   ts.getDate() === filterDateObj.getDate();
+        })
+        .forEach(s => {
+            const d = formatDate(s.timestamp);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${d}</td>
+                <td>${mbps(s.download)}</td>
+                <td>${mbps(s.upload)}</td>
+                <td>${s.ping} ms</td>
+                <td>${s.serverId || '-'}</td>
+                <td>${s.serverHost || '-'}</td>
+                <td>${s.serverLocation || '-'}</td>
+            `;
+            speedTable.appendChild(row);
+        });
+
+    // PING LOGS
+    logs.ping
+        .filter(p => {
+            if (!filterDateObj) return true;
+            const ts = new Date(p.timestamp);
+            return ts.getFullYear() === filterDateObj.getFullYear() &&
+                   ts.getMonth() === filterDateObj.getMonth() &&
+                   ts.getDate() === filterDateObj.getDate();
+        })
+        .forEach(p => {
+            const d = formatDate(p.timestamp);
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${d}</td><td>${p.host}</td><td class='${latencyClass(p.timems)}'>${p.timems} ms</td><td>${p.success === 'true' ? '✅' : '❌'}</td>`;
+            pingTable.appendChild(row);
+        });
+
+    // TRACEROUTE LOGS
+    logs.trace
+        .filter(t => {
+            if (!filterDateObj) return true;
+            const ts = new Date(t.timestamp);
+            return ts.getFullYear() === filterDateObj.getFullYear() &&
+                   ts.getMonth() === filterDateObj.getMonth() &&
+                   ts.getDate() === filterDateObj.getDate();
+        })
+        .forEach(t => {
+            const d = formatDate(t.timestamp);
+            t.hops.forEach(h => {
+                if (h.ip === '*') return;
+                const valid = h.times.filter(x => x !== null);
+                const avg = valid.length ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) : '-';
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${d}</td><td>${t.id}</td><td>${h.hop}</td><td>${h.ip}</td><td>${avg} ms</td>`;
+                traceTable.appendChild(row);
+            });
+        });
+}
 
     loadLogs();
     setInterval(loadLogs, REFRESH_MS);
+}
+
+const downloadBtn = document.getElementById("downloadBtn");
+const downloadOptions = document.getElementById("downloadOptions");
+
+downloadBtn.addEventListener("click", () => {
+    downloadOptions.style.display = downloadOptions.style.display === "block" ? "none" : "block";
+});
+
+window.addEventListener("click", (e) => {
+    if (!downloadBtn.contains(e.target)) {
+        downloadOptions.style.display = "none";
+    }
+});
+
+downloadOptions.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const format = btn.dataset.format;
+        downloadOptions.style.display = "none";
+        downloadLogs(format);
+    });
+});
+
+function downloadLogs(format) {
+    const allLogs = { speed: logs.speed, ping: logs.ping, trace: logs.trace };
+    let content = '';
+    let type = '';
+    let filename = `network_logs_${new Date().toISOString().split("T")[0]}`;
+
+    switch(format) {
+        case 'json':
+            content = JSON.stringify(allLogs, null, 2);
+            type = "application/json";
+            filename += ".json";
+            break;
+
+        case 'csv':
+            if (logs.speed.length > 0) {
+                const headers = Object.keys(logs.speed[0]);
+                const rows = logs.speed.map(r => headers.map(h => r[h]).join(","));
+                content = headers.join(",") + "\n" + rows.join("\n");
+            }
+            type = "text/csv";
+            filename += ".csv";
+            break;
+
+        case 'txt':
+            content = `=== SPEED LOGS ===\n${JSON.stringify(logs.speed, null, 2)}\n\n` +
+                      `=== PING LOGS ===\n${JSON.stringify(logs.ping, null, 2)}\n\n` +
+                      `=== TRACE LOGS ===\n${JSON.stringify(logs.trace, null, 2)}`;
+            type = "text/plain";
+            filename += ".txt";
+            break;
+
+        case 'html':
+            content = `<html><body><h2>Speed Logs</h2><table border="1"><tr>` +
+                      Object.keys(logs.speed[0] || {}).map(h => `<th>${h}</th>`).join("") +
+                      `</tr>` +
+                      logs.speed.map(r => `<tr>${Object.values(r).map(v => `<td>${v}</td>`).join("")}</tr>`).join("") +
+                      `</table></body></html>`;
+            type = "text/html";
+            filename += ".html";
+            break;
+    }
+
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
