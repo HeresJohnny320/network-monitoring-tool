@@ -1,5 +1,5 @@
 
-go/database.db
-go/config.json
-go/network_monitor_tool
-go/build
+database.db
+config.json
+network_monitor_tool
+build
