@@ -57,6 +57,6 @@ for target in "${TARGETS[@]}"; do
 done
 
 rm -rf "$DIST/stage"
-(cd "$DIST" && sha256sum ./*.tar.gz ./*.zip 2>/dev/null | sed 's# \./# #' > checksums.txt)
+(cd "$DIST" && sha256sum $(ls *.tar.gz *.zip 2>/dev/null) > checksums.txt)
 echo "Done! Archives are in $DIST/"
 ls -lh "$DIST"

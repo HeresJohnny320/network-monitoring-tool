@@ -179,7 +179,7 @@ install_ookla() { # platform-suffix
 }
 
 install_pkg() { # package name, using whatever package manager exists
-    if have apt-get; then apt-get install -y "$1"
+    if have apt-get; then apt-get install -y "$1" || { apt-get update && apt-get install -y "$1"; }
     elif have dnf; then dnf install -y "$1"
     elif have yum; then yum install -y "$1"
     elif have pacman; then pacman -S --noconfirm "$1"
@@ -221,10 +221,13 @@ mkdir -p "$DATA_DIR"
 chmod 700 "$DATA_DIR"
 
 # Bring over config/data from running it by hand before (as the sudo user).
-if [ ! -f "$DATA_DIR/config.json" ] && [ -n "${SUDO_USER:-}" ]; then
+# (as the sudo user, or as root itself, e.g. on pfSense)
+if [ ! -f "$DATA_DIR/config.json" ]; then
+    OLD_HOME="$HOME"
+    [ -n "${SUDO_USER:-}" ] && OLD_HOME="$(eval echo "~$SUDO_USER")"
     case "$OS" in
-        darwin) OLD="/Users/$SUDO_USER/Library/Application Support/heresjohnnys320_network_monitor_tool" ;;
-        *) OLD="$(eval echo "~$SUDO_USER")/.config/heresjohnnys320_network_monitor_tool" ;;
+        darwin) OLD="$OLD_HOME/Library/Application Support/heresjohnnys320_network_monitor_tool" ;;
+        *) OLD="$OLD_HOME/.config/heresjohnnys320_network_monitor_tool" ;;
     esac
     if [ -f "$OLD/config.json" ]; then
         say "Copying your existing config and data from $OLD"
