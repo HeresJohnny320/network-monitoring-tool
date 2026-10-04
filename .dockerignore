@@ -1,0 +1,5 @@
+.git
+dist
+build
+*.png
+java.zip

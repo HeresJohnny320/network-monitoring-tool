@@ -2,135 +2,236 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Network Dashboard & Logs</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Network Monitor</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M4 22a12 12 0 0 1 24 0' fill='none' stroke='%2338bdf8' stroke-width='3' stroke-linecap='round'/><path d='M16 22l6-8' stroke='%2322c55e' stroke-width='3' stroke-linecap='round'/></svg>">
+    <link rel="stylesheet" href="static/style.css">
+    <script>
+        try { const t = localStorage.getItem("netmon.theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    </script>
 </head>
 <body>
 
-<header>📊 Network Dashboard</header>
-
-
-<div class="container">
-
-    <div class="filter-row">
-        <button class="tab-btn" data-tab="dashboard">Dashboard</button>
-        <button class="tab-btn" data-tab="logs">Logs</button>
+<header class="topbar">
+    <div class="brand">
+        <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path d="M4 22a12 12 0 0 1 24 0" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/><path d="M16 22l6-8" stroke="var(--good)" stroke-width="3" stroke-linecap="round"/></svg>
+        <span>Network Monitor</span>
     </div>
+    <nav class="tabs" role="tablist">
+        <a href="#overview" class="tab" data-view="overview">Overview</a>
+        <a href="#history" class="tab" data-view="history">History</a>
+        <a href="#settings" class="tab" data-view="settings">Settings</a>
+    </nav>
+    <div class="run-box">
+        <span id="runStatus" class="run-status">Loading…</span>
+        <button id="runNow" class="btn btn-primary" type="button">Run test now</button>
+        <button id="themeToggle" class="btn btn-icon" type="button" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+    </div>
+</header>
 
-    <div id="dashboard" class="tab-section">
-        <div class="card">
-            <h2>⚡ Speed Test</h2>
-            <div class="stat" id="download">Download: --</div>
-            <div class="stat" id="upload">Upload: --</div>
-            <div class="stat" id="speedPing">Ping: --</div>
-            <div class="stat" id="serverLocation">Server: --</div>
+<main class="container">
+    <div id="alerts"></div>
+
+    <div id="rangeBar" class="range-bar">
+        <div class="chips" role="group" aria-label="Time range">
+            <button class="chip" data-range="24h">24 hours</button>
+            <button class="chip" data-range="7d">7 days</button>
+            <button class="chip" data-range="30d">30 days</button>
+            <button class="chip" data-range="90d">90 days</button>
+            <button class="chip" data-range="all">All</button>
+            <button class="chip" data-range="custom">Custom</button>
         </div>
-
-        <div class="card">
-            <h2>📡 Ping Status</h2>
-            <table>
-                <thead>
-                <tr>
-                    <th>Host</th>
-                    <th>Latency</th>
-                    <th>Status</th>
-                </tr>
-                </thead>
-                <tbody id="pingTable"></tbody>
-            </table>
-        </div>
-
-        <div class="card">
-            <h2>🧭 Latest Traceroute</h2>
-            <table>
-                <thead>
-                <tr>
-                    <th>Hop</th>
-                    <th>IP</th>
-                    <th>Avg ms</th>
-                </tr>
-                </thead>
-                <tbody id="traceTable"></tbody>
-            </table>
+        <div id="customRange" class="custom-range" hidden>
+            <input type="date" id="rangeFrom" aria-label="From">
+            <span>to</span>
+            <input type="date" id="rangeTo" aria-label="To">
+            <button id="applyRange" class="btn">Apply</button>
         </div>
     </div>
 
-    <div id="logs" class="tab-section" style="display:none;">
-        <div class="filter-row">
-            <label for="filterDate">Date:</label>
-            <input type="date" id="filterDate">
-            <button id="applyFilter">Apply</button>
-            <div class="download-dropdown">
-                <button id="downloadBtn">Download Logs ⬇️</button>
-                <div id="downloadOptions" class="dropdown-content" style="display:none;">
-                    <button data-format="json">JSON</button>
-                    <button data-format="csv">CSV</button>
-                    <button data-format="txt">TXT</button>
-                    <button data-format="html">HTML</button>
+    <!-- OVERVIEW -->
+    <section id="view-overview" class="view" hidden>
+        <div class="kpis" id="kpis"></div>
+
+        <div class="card">
+            <div class="card-head">
+                <h2>Speed over time</h2>
+                <span class="muted" id="speedCount"></span>
+            </div>
+            <div class="chart-box"><canvas id="speedChart"></canvas></div>
+            <p class="empty" id="speedEmpty" hidden>No speed tests in this range yet.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-head">
+                <h2>Latency &amp; packet loss</h2>
+                <span class="muted" id="pingCount"></span>
+            </div>
+            <div class="chart-box"><canvas id="pingChart"></canvas></div>
+            <p class="empty" id="pingEmpty" hidden>No pings in this range yet.</p>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-head"><h2>Hosts</h2></div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Host</th><th>Last</th><th>Avg</th><th>Min / Max</th><th>Jitter</th><th>Loss</th><th>Uptime</th></tr></thead>
+                        <tbody id="hostTable"></tbody>
+                    </table>
                 </div>
+            </div>
+            <div class="card">
+                <div class="card-head">
+                    <h2>Latest speed test</h2>
+                </div>
+                <dl class="details" id="latestSpeed"></dl>
             </div>
         </div>
 
-        <h2>⚡ Speed Test Logs</h2>
-        <table id="speedTable">
-            <thead>
-            <th>Date</th>
-            <th>Download</th>
-            <th>Upload</th>
-            <th>Ping</th>
-            <th>Server ID</th>
-            <th>Server Host</th>
-            <th>Server Location</th>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="card">
+            <div class="card-head">
+                <h2>Latest traceroute</h2>
+                <div class="seg" id="traceHosts"></div>
+            </div>
+            <div id="traceView"></div>
+        </div>
+    </section>
 
-        <h2>📡 Ping Logs</h2>
-        <table id="pingLogs">
-            <thead>
-            <tr><th>Date</th><th>Host</th><th>Latency</th><th>Status</th></tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <!-- HISTORY -->
+    <section id="view-history" class="view" hidden>
+        <div class="card">
+            <div class="card-head">
+                <div class="seg" id="historyTabs">
+                    <button data-kind="speedtest" class="active">Speed tests</button>
+                    <button data-kind="ping">Ping</button>
+                    <button data-kind="traceroute">Traceroute</button>
+                </div>
+                <div class="toolbar">
+                    <select id="historyHost" hidden aria-label="Host"></select>
+                    <a class="btn" id="exportCsv" download>Export CSV</a>
+                    <a class="btn" id="exportJson" download>Export JSON</a>
+                    <a class="btn" id="exportAll" download>Everything (JSON)</a>
+                </div>
+            </div>
+            <div class="table-wrap" id="historyTable"></div>
+            <div class="more"><button id="historyMore" class="btn" hidden>Show more</button></div>
+        </div>
+    </section>
 
-        <h2>🧭 Traceroute Logs</h2>
-        <table id="traceLogs">
-            <thead>
-            <tr>
-                <th>Date</th>
-                <th>ID</th>
-                <th>Hop</th>
-                <th>IP</th>
-                <th>Avg ms</th>
-            </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <!-- SETTINGS -->
+    <section id="view-settings" class="view" hidden>
+        <form id="settingsForm" class="settings" autocomplete="off">
+            <div class="card">
+                <h2>Schedule</h2>
+                <div class="fields">
+                    <label>Run tests every
+                        <input name="run_every" list="intervals" required placeholder="1h">
+                        <datalist id="intervals">
+                            <option value="15m"><option value="30m"><option value="1h"><option value="2h"><option value="3h"><option value="6h"><option value="12h"><option value="1d">
+                        </datalist>
+                        <small>Examples: 30m, 1h, 1h30m, 1d. Minimum 30s.</small>
+                    </label>
+                    <label class="check"><input type="checkbox" name="align_to_clock"> Line up with the clock
+                        <small>e.g. 1h runs at 1:00, 2:00, 3:00… instead of an hour after startup.</small>
+                    </label>
+                    <label>Keep results for (days)
+                        <input name="retention_days" type="number" min="0" step="1">
+                        <small>0 keeps everything forever.</small>
+                    </label>
+                </div>
+            </div>
 
-        <h2>Charts</h2>
-        <canvas id="speedChart" height="100"></canvas>
-        <canvas id="pingChart" height="100"></canvas>
-    </div>
+            <div class="card">
+                <h2>Your internet plan</h2>
+                <p class="muted">Enter what you pay for to see how often your ISP actually delivers it.</p>
+                <div class="fields">
+                    <label>Download (Mbps)<input name="plan_download_mbps" type="number" min="0" step="any" placeholder="e.g. 500"></label>
+                    <label>Upload (Mbps)<input name="plan_upload_mbps" type="number" min="0" step="any" placeholder="e.g. 50"></label>
+                </div>
+            </div>
 
-</div>
+            <div class="card">
+                <h2>Tests</h2>
+                <div class="fields">
+                    <label class="check"><input type="checkbox" name="run_ping"> Ping</label>
+                    <label class="check"><input type="checkbox" name="run_traceroute"> Traceroute</label>
+                    <label class="check"><input type="checkbox" name="run_speedtest"> Speed test</label>
+                </div>
+                <div class="fields">
+                    <label>Ping hosts (one per line)<textarea name="ping_host" rows="4"></textarea></label>
+                    <label>Traceroute hosts (one per line)<textarea name="traceroute_host" rows="4"></textarea></label>
+                </div>
+                <div class="fields">
+                    <label>Pings per host
+                        <input name="ping_count" type="number" min="1" max="20" step="1">
+                        <small>More pings give better packet loss and jitter numbers.</small>
+                    </label>
+                    <label>Speed test server ID
+                        <input name="speedtest_server_id" inputmode="numeric" placeholder="Automatic">
+                        <small>Leave blank to use the closest server. List IDs with <code>speedtest -L</code>.</small>
+                    </label>
+                    <label>Speed test program
+                        <select name="speedtest_engine">
+                            <option value="auto">Automatic</option>
+                            <option value="ookla">Ookla Speedtest CLI</option>
+                            <option value="python">speedtest-cli (Python)</option>
+                        </select>
+                    </label>
+                    <label>Speed test path
+                        <input name="speedtest_path" placeholder="Found automatically">
+                        <small id="speedtestFound"></small>
+                    </label>
+                </div>
+            </div>
 
-<script src="/static/app.js"></script>
+            <div class="card">
+                <h2>Web interface</h2>
+                <div class="fields">
+                    <label>Listen address
+                        <input name="listen" placeholder=":8080">
+                        <small><code>:8080</code> = reachable from your network, <code>127.0.0.1:8080</code> = this computer only. Needs a restart.</small>
+                    </label>
+                    <label>Password
+                        <input name="ui_password" type="password" autocomplete="new-password" placeholder="No password">
+                        <small id="uiPasswordHint">Optional. Log in with any username.</small>
+                    </label>
+                    <label class="check" id="clearUiPasswordWrap" hidden><input type="checkbox" name="clear_ui_password"> Remove the password</label>
+                </div>
+            </div>
 
-<script>
-    document.querySelectorAll(".tab-btn").forEach(btn=>{
-        btn.addEventListener("click",()=>{
-            const tab=btn.dataset.tab;
-            document.querySelectorAll(".tab-section").forEach(sec=>{
-                sec.style.display = sec.id===tab ? "block" : "none";
-            });
-        });
-    });
-</script>
-<footer>want to make ur own api calls ? there ya go all in json :)</footer>
-<footer>http://localhost:8080/speedtest</footer>
-<footer>http://localhost:8080/traceroute</footer>
-<footer>http://localhost:8080/ping</footer>
+            <div class="card">
+                <h2>Database</h2>
+                <p class="muted" id="dbLocation"></p>
+                <div class="fields">
+                    <label class="check"><input type="checkbox" name="run_sql"> Use MySQL / MariaDB instead of the built-in SQLite file</label>
+                </div>
+                <div class="fields" id="sqlFields">
+                    <label>Host<input name="sql_host"></label>
+                    <label>Port<input name="sql_port" inputmode="numeric"></label>
+                    <label>Database<input name="sql_database"></label>
+                    <label>User<input name="sql_user"></label>
+                    <label>Password<input name="sql_password" type="password" autocomplete="new-password" placeholder="Unchanged"></label>
+                </div>
+            </div>
+
+            <div class="save-bar">
+                <span class="muted" id="configPath"></span>
+                <button type="submit" class="btn btn-primary">Save settings</button>
+            </div>
+        </form>
+    </section>
+</main>
+
+<footer class="footer">
+    <span id="versionInfo"></span>
+    <span>JSON API: <a href="api/summary" class="api-link">summary</a> · <a href="api/speedtest" class="api-link">speedtest</a> · <a href="api/ping" class="api-link">ping</a> · <a href="api/traceroute" class="api-link">traceroute</a> · <a href="api/status" class="api-link">status</a></span>
+    <a href="https://github.com/HeresJohnny320/network-monitoring-tool" target="_blank" rel="noopener">GitHub</a>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="static/vendor/chart.umd.min.js"></script>
+<script src="static/app.js"></script>
 </body>
 </html>

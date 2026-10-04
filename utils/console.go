@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -37,8 +38,22 @@ var Styles = map[string]string{
 	"strikethrough": "\033[9m",
 }
 
+// Only colorize when writing to a terminal; services log to syslog/journald/files
+// where escape codes just show up as garbage.
+var useColor = func() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	info, err := os.Stdout.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}()
+
 func PrintColor(color string, text string, styles ...string) {
 	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05")
+	if !useColor {
+		fmt.Println("[" + timestamp + "] " + text)
+		return
+	}
 	code, ok := Colors[color]
 	if !ok {
 		code = Styles["reset"]

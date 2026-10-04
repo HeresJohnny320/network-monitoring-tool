@@ -5,65 +5,119 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
-func ParseDuration(input string) (time.Duration, error) {
-	input = strings.ToLower(input)
-	re := regexp.MustCompile(`(\d+)([hms])`)
-	matches := re.FindAllStringSubmatch(input, -1)
+var intervalRe = regexp.MustCompile(`(\d+)([dhms])`)
 
-	if len(matches) == 0 {
-		return 0, fmt.Errorf("invalid duration format: %s", input)
+// ParseInterval accepts Go durations ("1h30m") plus days ("1d").
+func ParseInterval(input string) (time.Duration, error) {
+	input = strings.ToLower(strings.TrimSpace(input))
+	if d, err := time.ParseDuration(input); err == nil {
+		return d, nil
+	}
+	if strings.TrimSpace(intervalRe.ReplaceAllString(input, "")) != "" || input == "" {
+		return 0, fmt.Errorf("invalid duration %q (try 30m, 1h, 1h30m or 1d)", input)
 	}
 
-	var totalMs int64 = 0
-	for _, match := range matches {
+	var total time.Duration
+	for _, match := range intervalRe.FindAllStringSubmatch(input, -1) {
 		value, _ := strconv.Atoi(match[1])
-		unit := match[2]
-
-		switch unit {
+		switch match[2] {
+		case "d":
+			total += time.Duration(value) * 24 * time.Hour
 		case "h":
-			totalMs += int64(value) * 60 * 60 * 1000
+			total += time.Duration(value) * time.Hour
 		case "m":
-			totalMs += int64(value) * 60 * 1000
+			total += time.Duration(value) * time.Minute
 		case "s":
-			totalMs += int64(value) * 1000
-		default:
-			return 0, fmt.Errorf("unknown time unit: %s", unit)
+			total += time.Duration(value) * time.Second
 		}
 	}
-
-	return time.Duration(totalMs) * time.Millisecond, nil
+	return total, nil
 }
 
-func ScheduleRepeating(durationStr string, task func()) error {
-	interval, err := ParseDuration(durationStr)
-	if err != nil {
-		return err
+// NextRunTime returns when the next run should happen. With align, runs land on
+// multiples of the interval counted from local midnight (1h -> every hour on the hour).
+func NextRunTime(now time.Time, interval time.Duration, align bool) time.Time {
+	if !align || interval > 24*time.Hour {
+		return now.Add(interval)
 	}
-
-	if interval <= 0 {
-		return fmt.Errorf("duration must be positive")
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	elapsed := now.Sub(midnight)
+	next := midnight.Add((elapsed/interval + 1) * interval)
+	// Don't run past midnight with a partial slot; start fresh from the next midnight.
+	if nextMidnight := midnight.AddDate(0, 0, 1); next.After(nextMidnight) {
+		next = nextMidnight
 	}
-
-	ticker := time.NewTicker(interval)
-
-	go task()
-
-	go func() {
-		for range ticker.C {
-			task()
-		}
-	}()
-
-	return nil
+	return next
 }
 
-func ScheduleFromConfig(task func()) error {
-	if Cfg == nil {
-		return fmt.Errorf("config not loaded")
+// Scheduler runs a task repeatedly and can be rescheduled when settings change.
+type Scheduler struct {
+	mu       sync.Mutex
+	task     func()
+	timer    *time.Timer
+	next     time.Time
+	interval time.Duration
+	align    bool
+	stopped  bool
+}
+
+func NewScheduler(task func()) *Scheduler {
+	return &Scheduler{task: task}
+}
+
+// Start schedules the task; with runNow it also runs once immediately.
+func (s *Scheduler) Start(interval time.Duration, align bool, runNow bool) {
+	if runNow {
+		go s.task()
 	}
-	PrintColor("cyan", "Running Tools Every:"+Cfg.RunEvery+"\n")
-	return ScheduleRepeating(Cfg.RunEvery, task)
+	s.Reschedule(interval, align)
+}
+
+func (s *Scheduler) Reschedule(interval time.Duration, align bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stopped {
+		return
+	}
+	s.interval = interval
+	s.align = align
+	s.armLocked()
+}
+
+func (s *Scheduler) armLocked() {
+	if s.timer != nil {
+		s.timer.Stop()
+	}
+	s.next = NextRunTime(time.Now(), s.interval, s.align)
+	s.timer = time.AfterFunc(time.Until(s.next), s.fire)
+}
+
+func (s *Scheduler) fire() {
+	s.mu.Lock()
+	if s.stopped {
+		s.mu.Unlock()
+		return
+	}
+	s.armLocked()
+	s.mu.Unlock()
+	s.task()
+}
+
+func (s *Scheduler) NextRun() time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.next
+}
+
+func (s *Scheduler) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopped = true
+	if s.timer != nil {
+		s.timer.Stop()
+	}
 }

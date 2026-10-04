@@ -1,0 +1,13 @@
+# docker compose up -d   ->  http://localhost:8080
+services:
+  network-monitor:
+    image: ghcr.io/heresjohnny320/network-monitoring-tool:latest
+    # build: .            # or build it yourself instead of pulling
+    container_name: network-monitor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./netmon-data:/data # config.json and database.db
+    environment:
+      - TZ=America/New_York # your timezone, so the schedule lines up with your clock

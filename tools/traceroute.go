@@ -1,16 +1,19 @@
 package tools
 
 import (
+	"context"
 	"database/sql"
-	"encoding/json"
-	"net/http"
-	"network_monitor_tool/utils"
+	"fmt"
+	"net"
 	"os/exec"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"network_monitor_tool/utils"
 )
 
 type TracerouteHop struct {
@@ -20,93 +23,90 @@ type TracerouteHop struct {
 }
 
 type TracerouteResult struct {
-	ID        int             `json:"id,omitempty"`
+	ID        int64           `json:"id,omitempty"`
 	Host      string          `json:"host"`
 	Timestamp string          `json:"timestamp"`
 	Hops      []TracerouteHop `json:"hops"`
 }
 
-func RunTracerouteForHosts(hosts []string) {
-	if len(hosts) == 0 {
-		return
+// RunTracerouteForHosts traces every host in parallel and returns the first error.
+func RunTracerouteForHosts(hosts []string) error {
+	errs := make([]error, len(hosts))
+	var wg sync.WaitGroup
+	for i, host := range hosts {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = RunTraceroute(host)
+		}()
 	}
-	for _, host := range hosts {
-		RunTraceroute(host)
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
-func RunTraceroute(host string) TracerouteResult {
+
+func RunTraceroute(host string) (TracerouteResult, error) {
+	now := time.Now()
 	result := TracerouteResult{
 		Host:      host,
-		Timestamp: time.Now().UTC().Format("2006-01-02 15:04:05"),
+		Timestamp: now.UTC().Format(time.RFC3339),
 		Hops:      []TracerouteHop{},
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("tracert", "-d", host)
+		cmd = exec.CommandContext(ctx, "tracert", "-d", "-h", "30", "-w", "1000", host)
 	} else {
-		cmd = exec.Command("traceroute", "-n", host)
+		cmd = exec.CommandContext(ctx, "traceroute", "-n", "-m", "30", "-w", "2", "-q", "3", host)
 	}
 
 	output, err := cmd.Output()
+	if err != nil && len(output) == 0 {
+		utils.PrintColor("red", "Traceroute error ("+host+"): "+err.Error())
+		return result, fmt.Errorf("traceroute %s: %v", host, err)
+	}
+	result.Hops = ParseTracerouteOutput(string(output))
+	utils.PrintColor("magenta", fmt.Sprintf("Traceroute %s: %d hops", host, len(result.Hops)))
+
+	id, err := saveTraceroute(result, utils.DBTime(now))
 	if err != nil {
-		utils.PrintColor("red", "Traceroute error:", err.Error())
-		return result
+		utils.PrintColor("red", "DB insert error: "+err.Error())
+		return result, err
 	}
+	result.ID = id
+	return result, nil
+}
 
-	lines := strings.Split(string(output), "\n")
-	hopNumber := 0
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		hop, ok := parseHop(line, runtime.GOOS, hopNumber+1)
-		if ok {
-			result.Hops = append(result.Hops, hop)
-			hopNumber++
-		}
-	}
-
-	jsonBytes, err := json.MarshalIndent(result, "", "  ")
+func saveTraceroute(result TracerouteResult, timestamp string) (int64, error) {
+	conn, err := db()
 	if err != nil {
-		utils.PrintColor("red", "JSON marshal error:", err.Error())
-	} else {
-		utils.PrintColor("magenta", "Traceroute result:"+string(jsonBytes))
+		return 0, err
 	}
-
-	db := utils.GetDatabase()
-	conn, err := db.GetConnection()
+	tx, err := conn.Begin()
 	if err != nil {
-		utils.PrintColor("red", "DB connection error:", err.Error())
-		return result
+		return 0, err
 	}
-	defer conn.Close()
+	defer tx.Rollback()
 
-	resStmt, err := conn.Prepare(`INSERT INTO traceroute_results (host, timestamp) VALUES (?, ?)`)
+	res, err := tx.Exec(`INSERT INTO traceroute_results (host, timestamp) VALUES (?, ?)`, result.Host, timestamp)
 	if err != nil {
-		utils.PrintColor("red", "DB prepare error:", err.Error())
-		return result
+		return 0, err
 	}
-	defer resStmt.Close()
-
-	res, err := resStmt.Exec(result.Host, result.Timestamp)
-	if err != nil {
-		utils.PrintColor("red", "DB insert error:", err.Error())
-		return result
-	}
-
 	tracerouteID, err := res.LastInsertId()
 	if err != nil {
-		utils.PrintColor("red", "DB last insert id error:", err.Error())
-		return result
+		return 0, err
 	}
 
-	hopStmt, err := conn.Prepare(`INSERT INTO traceroute_hops (traceroute_id, hop_number, ip, time1_ms, time2_ms, time3_ms) VALUES (?, ?, ?, ?, ?, ?)`)
+	hopStmt, err := tx.Prepare(`INSERT INTO traceroute_hops (traceroute_id, hop_number, ip, time1_ms, time2_ms, time3_ms) VALUES (?, ?, ?, ?, ?, ?)`)
 	if err != nil {
-		utils.PrintColor("red", "DB prepare hop error:", err.Error())
-		return result
+		return 0, err
 	}
 	defer hopStmt.Close()
 
@@ -115,122 +115,138 @@ func RunTraceroute(host string) TracerouteResult {
 		for i := 0; i < 3 && i < len(h.Times); i++ {
 			times[i] = h.Times[i]
 		}
-		_, _ = hopStmt.Exec(tracerouteID, h.Hop, h.IP, times[0], times[1], times[2])
+		if _, err := hopStmt.Exec(tracerouteID, h.Hop, h.IP, times[0], times[1], times[2]); err != nil {
+			return 0, err
+		}
 	}
-
-	return result
+	return tracerouteID, tx.Commit()
 }
 
-func parseHop(line, osName string, hopNumber int) (TracerouteHop, bool) {
-	hop := TracerouteHop{
-		Hop:   hopNumber,
-		Times: []*float64{},
-	}
+var hopLineRe = regexp.MustCompile(`^\s*(\d+)\s+(.*)$`)
 
-	if strings.Contains(osName, "win") {
-		pattern := regexp.MustCompile(`^\s*(\d+)\s+(\*|\d+\s*ms|\*\s*)\s+(\*|\d+\s*ms|\*\s*)\s+(\*|\d+\s*ms|\*\s*)\s+([\d\.]+|\*)$`)
-		matches := pattern.FindStringSubmatch(line)
-		if len(matches) == 0 {
-			return hop, false
+// ParseTracerouteOutput handles traceroute (Linux/macOS/BSD) and tracert (Windows):
+//
+//	3  10.0.0.1  5.123 ms  4.987 ms *
+//	3     5 ms    <1 ms     4 ms  10.0.0.1
+//	4     *        *        *     Request timed out.
+func ParseTracerouteOutput(output string) []TracerouteHop {
+	hops := []TracerouteHop{}
+	for _, line := range strings.Split(output, "\n") {
+		m := hopLineRe.FindStringSubmatch(line)
+		if m == nil {
+			continue
 		}
+		hopNumber, _ := strconv.Atoi(m[1])
+		hop := TracerouteHop{Hop: hopNumber, IP: "*", Times: []*float64{}}
 
-		hop.IP = matches[5]
-		timeFields := []string{matches[2], matches[3], matches[4]}
-		for _, t := range timeFields {
-			hop.Times = append(hop.Times, parseTime(strings.TrimSpace(t)))
+		fields := strings.Fields(m[2])
+		for i := 0; i < len(fields); i++ {
+			f := fields[i]
+			switch {
+			case f == "*":
+				hop.Times = append(hop.Times, nil)
+			case strings.HasSuffix(f, "ms") && len(f) > 2: // Windows "<1ms" or "12ms"
+				if v, ok := parseMs(strings.TrimSuffix(f, "ms")); ok {
+					hop.Times = append(hop.Times, &v)
+				}
+			case i+1 < len(fields) && fields[i+1] == "ms":
+				if v, ok := parseMs(f); ok {
+					hop.Times = append(hop.Times, &v)
+				}
+				i++
+			default:
+				if ip := strings.Trim(f, "()[]"); hop.IP == "*" && net.ParseIP(ip) != nil {
+					hop.IP = ip
+				}
+			}
 		}
-		return hop, true
-
-	} else {
-		pattern := regexp.MustCompile(`^\s*(\d+)\s+([\d\.]+|\*)\s+(.*)$`)
-		matches := pattern.FindStringSubmatch(line)
-		if len(matches) == 0 {
-			return hop, false
+		if len(hop.Times) > 3 {
+			hop.Times = hop.Times[:3]
 		}
-
-		hop.IP = matches[2]
-		rest := strings.TrimSpace(matches[3])
-
-		timePattern := regexp.MustCompile(`(\d+\.\d+\s*ms|\*)`)
-		timeMatches := timePattern.FindAllString(rest, -1)
-		for _, t := range timeMatches {
-			hop.Times = append(hop.Times, parseTime(t))
-		}
-
 		for len(hop.Times) < 3 {
 			hop.Times = append(hop.Times, nil)
 		}
-
-		return hop, true
+		hops = append(hops, hop)
 	}
+	return hops
 }
 
-func parseTime(s string) *float64 {
-	s = strings.TrimSpace(s)
-	if s == "*" || s == "" {
-		return nil
-	}
-	s = strings.TrimSuffix(s, "ms")
-	s = strings.TrimSpace(s)
-	val, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return nil
-	}
-	return &val
+func parseMs(s string) (float64, bool) {
+	s = strings.TrimPrefix(strings.TrimSpace(s), "<")
+	v, err := strconv.ParseFloat(s, 64)
+	return v, err == nil
 }
 
-func GetAllTraceroutes(w http.ResponseWriter, r *http.Request) {
-	db := utils.GetDatabase()
-	conn, err := db.GetConnection()
+// QueryTraceroutes returns traceroutes in the range, newest first. limit <= 0 means no limit.
+func QueryTraceroutes(r TimeRange, limit int) ([]TracerouteResult, error) {
+	conn, err := db()
 	if err != nil {
-		http.Error(w, "DB connection error", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
-	defer conn.Close()
+	where, args := r.where("timestamp")
+	query := "SELECT id, host, timestamp FROM traceroute_results" + where + " ORDER BY id DESC"
+	if limit > 0 {
+		query += " LIMIT " + strconv.Itoa(limit)
+	}
+	rows, err := conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
 
 	results := []TracerouteResult{}
-	rows, err := conn.Query(`SELECT id, host, timestamp FROM traceroute_results ORDER BY id DESC`)
-	if err != nil {
-		http.Error(w, "DB query error", http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
+	index := map[int64]int{}
 	for rows.Next() {
 		var res TracerouteResult
-		var tracerouteID int
-		if err := rows.Scan(&tracerouteID, &res.Host, &res.Timestamp); err != nil {
+		var ts any
+		if err := rows.Scan(&res.ID, &res.Host, &ts); err != nil {
 			continue
 		}
-		res.ID = tracerouteID
+		res.Timestamp = utils.FormatDBTime(ts)
+		res.Hops = []TracerouteHop{}
+		index[res.ID] = len(results)
+		results = append(results, res)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-		hopsRows, err := conn.Query(`SELECT hop_number, ip, time1_ms, time2_ms, time3_ms FROM traceroute_hops WHERE traceroute_id = ? ORDER BY hop_number ASC`, tracerouteID)
-		if err != nil {
-			continue
+	// Load hops in batches instead of one query per traceroute.
+	const batch = 500
+	for start := 0; start < len(results); start += batch {
+		end := min(start+batch, len(results))
+		ids := make([]any, 0, end-start)
+		for _, res := range results[start:end] {
+			ids = append(ids, res.ID)
 		}
-		for hopsRows.Next() {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+		hopRows, err := conn.Query(`SELECT traceroute_id, hop_number, ip, time1_ms, time2_ms, time3_ms FROM traceroute_hops
+			WHERE traceroute_id IN (`+placeholders+`) ORDER BY traceroute_id, hop_number`, ids...)
+		if err != nil {
+			return nil, err
+		}
+		for hopRows.Next() {
+			var id int64
 			var h TracerouteHop
+			var ip sql.NullString
 			var t1, t2, t3 sql.NullFloat64
-			if err := hopsRows.Scan(&h.Hop, &h.IP, &t1, &t2, &t3); err != nil {
+			if err := hopRows.Scan(&id, &h.Hop, &ip, &t1, &t2, &t3); err != nil {
 				continue
 			}
-			times := []*float64{}
+			h.IP = ip.String
 			for _, t := range []sql.NullFloat64{t1, t2, t3} {
 				if t.Valid {
 					val := t.Float64
-					times = append(times, &val)
+					h.Times = append(h.Times, &val)
 				} else {
-					times = append(times, nil)
+					h.Times = append(h.Times, nil)
 				}
 			}
-			h.Times = times
-			res.Hops = append(res.Hops, h)
+			if i, ok := index[id]; ok {
+				results[i].Hops = append(results[i].Hops, h)
+			}
 		}
-		hopsRows.Close()
-
-		results = append(results, res)
+		hopRows.Close()
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	return results, nil
 }

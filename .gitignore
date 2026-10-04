@@ -1,5 +1,6 @@
-
 database.db
 config.json
 network_monitor_tool
+network_monitor_tool.exe
 build
+dist
