@@ -1,7 +1,13 @@
-# Builds for every platform on each push/PR. Pushing a tag like v1.5.0 also
-# publishes a GitHub release with all the archives and a Docker image on ghcr.io.
+# Builds every platform and publishes it.
 #
-#   git tag v1.5.0 && git push origin v1.5.0
+# * Push to main    -> tests, builds all platforms, and publishes the next release
+#                      (v1.8 -> v1.9 -> v1.10 ...) plus a Docker image. The install
+#                      scripts always download the newest release.
+#                      Put "[skip release]" in the commit message to only build.
+# * Push a tag v*   -> publishes that exact version (e.g. git tag v2.0 && git push origin v2.0)
+# * Pull request    -> tests and builds only
+# * Actions tab     -> "Run workflow" to publish by hand, optionally as a new major version
+# Docs-only changes (README, docs/) don't trigger anything.
 
 name: Build
 
@@ -9,19 +15,76 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
   workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        type: choice
+        options: [next, major]
+        default: next
 
 permissions:
   contents: read
 
+# Never let two releases run at once (they'd pick the same version number).
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  build:
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      release: ${{ steps.v.outputs.release }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # so `git describe` finds the version tag
+          fetch-depth: 0
+
+      - id: v
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          BUMP: ${{ inputs.bump || 'next' }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ "$REF_TYPE" = tag ]; then
+            echo "version=$REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Newest vX.Y or vX.Y.Z tag; bump its last number (or the major one).
+          latest=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+          latest=${latest:-v1.0}
+          IFS=. read -r major rest <<<"${latest#v}"
+          if [ "$BUMP" = major ]; then
+            next="v$((major + 1)).0"
+          else
+            last=${latest##*.}
+            next="${latest%.*}.$((last + 1))"
+          fi
+
+          release=false
+          if [ "$EVENT" = workflow_dispatch ] || { [ "$EVENT" = push ] && [ "$REF_NAME" = main ] && [[ "$COMMIT_MSG" != *"[skip release]"* ]]; }; then
+            release=true
+          else
+            next="$next-dev.$(git rev-parse --short HEAD)"
+          fi
+          echo "Latest release $latest -> building $next (publish: $release)"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
@@ -34,42 +97,46 @@ jobs:
 
       - name: Build all platforms
         run: ./build.sh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: network_monitor_tool-${{ github.sha }}
+          name: network_monitor_tool-${{ needs.version.outputs.version }}
           path: dist/*
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    if: needs.version.outputs.release == 'true'
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: network_monitor_tool-${{ github.sha }}
+          name: network_monitor_tool-${{ needs.version.outputs.version }}
           path: dist
 
+      # Creates the tag on this commit if it doesn't exist yet.
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.version.outputs.version }}
+          name: ${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: dist/*
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: true
 
   docker:
-    if: github.event_name == 'push'
-    needs: build
+    if: needs.version.outputs.release == 'true'
+    needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
@@ -83,12 +150,10 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository }} # lowercased automatically
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=edge,branch=main
+            type=raw,value=${{ needs.version.outputs.version }}
+            type=raw,value=latest
 
       - uses: docker/build-push-action@v6
         with:
@@ -97,4 +162,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ github.ref_name }}
+          build-args: VERSION=${{ needs.version.outputs.version }}
